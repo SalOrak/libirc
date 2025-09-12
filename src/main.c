@@ -1,70 +1,77 @@
 #include <stdio.h>
-#include <stdint.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <errno.h>
 
-#define CLIENT_NICKNAME_MAXLEN 9
-#define CLIENT_NAME_MAXLEN 255
+#define BIND_ADDR "0.0.0.0"
+#define BIND_PORT 8080
 
-typedef struct {
-    char nickname[CLIENT_NICKNAME_MAXLEN]; // Unique identifier
-    char real_name[CLIENT_NAME_MAXLEN]; // Real name of the host running on
-    char username[CLIENT_NAME_MAXLEN]; // Username of the Client on that host
-    uint32_t server_id; // Server identifier  for the client
-} Client;
-
-enum CHOP_CMDS {
-    KICK, // Eject a client from tHe channel 
-    MODE, // Change the channel's mode
-    INVITE, // Invite a client to an invite-only channel (mode +i) 
-    TOPIC // Change the channel topic in a mode +t channel
-};
-
-
-uint8_t internal_client_set_string(char *c, char* name, uint8_t maxlen, uint8_t len){
-    // TODO: Throw an error (?)
-    if (maxlen < len ) {
-        printf("[ERROR] maxlen(%zu) < len(%zu)\n", maxlen, len);
-        return 1; // Maybe an error here?
-    }
-
-    for (int i = 0 ; i < len; i++) {
-        c[i] = name[i];
-    }
-
-    c[len] = '\0';
-    return 0;
-
-}
-
-void client_set_nickname(Client *c, char* nick, uint8_t len)
-{
-    if (internal_client_set_string(c->nickname, nick, CLIENT_NICKNAME_MAXLEN, len) != 0)
-        printf("[ERROR]: Could not set the string in client_set_nickname()\n");
-}
-
-void client_set_realname(Client *c, char* name, uint8_t len)
-{
-    if (internal_client_set_string(c->real_name, name, CLIENT_NAME_MAXLEN, len) != 0)
-        printf("[ERROR]: Could not set the string in client_set_realname()\n");
-}
-
-void client_set_username(Client *c, char* name, uint8_t len)
-{
-    if (internal_client_set_string(c->username, name, CLIENT_NAME_MAXLEN, len) != 0)
-        printf("[ERROR]: Could not set the string in client_set_realname()\n");
-}
-
-
+void welcome(int sockefd);
 
 int main() 
 {
 
-    Client c = {0};
-    client_set_nickname(&c, "Hector", 6);
-    client_set_realname(&c, "Hector Alarcon Flores", 51);
-    client_set_username(&c, "hector-user", 11);
-    printf("Nickname: %s\n", c.nickname);
-    printf("Realname: %s\n", c.real_name);
-    printf("Username: %s\n", c.username);
-    printf("Hello world! : \n");
+    struct in_addr addr; 
+
+    if (inet_aton(BIND_ADDR, &addr) == 0 )
+    {
+        printf("Invalid address\n");
+        return 1;
+    }
+
+    printf("Address provided: %s\n", inet_ntoa(addr));
+        
+    struct sockaddr_in saddr = {0};
+    saddr.sin_family = AF_INET;
+    saddr.sin_addr = addr;
+    saddr.sin_port = htons(BIND_PORT);
+
+    const char *err_msg = NULL;
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd == 1) 
+    {
+        perror(err_msg);
+        return 1;
+    }
+
+    if (bind(fd, (struct sockaddr *)&saddr, sizeof(struct sockaddr)) == -1) 
+    {
+        perror(err_msg);
+        return 1;
+    }
+
+    if (listen(fd, 20) != 0) 
+    {
+        perror(err_msg);
+        return 1;
+    }
+
+    while (1){
+        printf("Waiting to accept connection...\n");
+        struct sockaddr_in caddr;
+        socklen_t clen = sizeof(struct sockaddr_in);
+        int sockfd = accept(fd, (struct sockaddr * )&caddr, &clen) ;
+        if (sockfd == -1) 
+        { perror(err_msg); return 1;}
+
+        printf("Created fd %d ..\n", sockfd);
+        printf("[CLIENT] Address: %s\n", inet_ntoa(caddr.sin_addr));
+        printf("[CLIENT] Port : %d\n", ntohs(caddr.sin_port));
+        welcome(sockfd);
+    }
+
     return 0;
 }
+
+void welcome(int sockfd) 
+{
+    for (size_t i = 0; i < 10; i ++)
+    {
+        send(sockfd, "Hello world\n", 12, MSG_CONFIRM);
+    }
+    close(sockfd);
+}
+
