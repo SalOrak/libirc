@@ -1,4 +1,4 @@
-BUILD_FOLDER="build/"
+BUILD_FOLDER := build/
 
 
 all: server client tmp
@@ -14,3 +14,12 @@ client: src/client.c
 tmp: src/tmp.c
 	@mkdir -p $(BUILD_FOLDER)
 	gcc $< -o $(BUILD_FOLDER)$@
+
+run-client: client
+	$(BUILD_FOLDER)client
+
+run-server: server
+	$(BUILD_FOLDER)server
+
+run-tmp: tmp 
+	$(BUILD_FOLDER)tmp
